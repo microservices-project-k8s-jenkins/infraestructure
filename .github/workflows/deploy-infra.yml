@@ -16,7 +16,6 @@ env:
   TF_VAR_aks_cluster_name:   ${{ secrets.TF_AKS_CLUSTER_NAME }}
   TF_VAR_acr_name:           ${{ secrets.TF_ACR_NAME }}
   TF_VAR_key_vault_name:     ${{ secrets.TF_KEYVAULT_NAME }}
-  TF_VAR_jwt_secret:         ${{ secrets.TF_JWT_SECRET }}
 
 jobs:
   deploy_infra:
