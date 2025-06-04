@@ -31,9 +31,3 @@ output "aks_cluster_name" {
 output "acr_name" {
     value = azurerm_container_registry.acr.name
 }
-
-output "jwt_secret_value" {
-  description = "The value of the JWT secret."
-  value       = azurerm_key_vault_secret.jwt.value
-  sensitive   = true
-}
