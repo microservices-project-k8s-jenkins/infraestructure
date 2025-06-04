@@ -60,15 +60,6 @@ resource "azurerm_key_vault" "key_vault" {
   }
 }
 
-resource "azurerm_key_vault_secret" "jwt" {
-  name         = "JWTSECRET"
-  value        = var.jwt_secret
-  key_vault_id = azurerm_key_vault.key_vault.id
-
-  depends_on = [
-    azurerm_key_vault.key_vault
-  ]
-}
 
 resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
