@@ -1,8 +1,6 @@
 name: Deploy Infrastructure and Kubernetes Base Config
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 env:
