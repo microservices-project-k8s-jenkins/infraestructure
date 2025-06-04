@@ -17,9 +17,3 @@ variable "acr_name" {
 variable "key_vault_name" {
   description = "The name of the Key Vault"
 }
-
-variable "jwt_secret" {
-  description = "The JWT Secret value"
-  type        = string
-  sensitive   = true
-}
