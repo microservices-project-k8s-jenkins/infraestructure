@@ -1,0 +1,80 @@
+name: Deploy Infrastructure and Kubernetes Base Config
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+  TF_VAR_location:           ${{ secrets.TF_LOCATION }}
+  TF_VAR_resource_group_name: ${{ secrets.TF_RG_NAME }}
+  TF_VAR_aks_cluster_name:   ${{ secrets.TF_AKS_CLUSTER_NAME }}
+  TF_VAR_acr_name:           ${{ secrets.TF_ACR_NAME }}
+  TF_VAR_key_vault_name:     ${{ secrets.TF_KEYVAULT_NAME }}
+  TF_VAR_jwt_secret:         ${{ secrets.TF_JWT_SECRET }}
+
+jobs:
+  deploy_infra:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.3"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform/
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: terraform/
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: terraform/
+        id: plan
+        run: terraform plan -no-color
+
+      - name: Terraform Apply
+        working-directory: terraform/
+        id: apply
+        run: terraform apply -auto-approve -no-color
+
+      - name: Export Terraform Outputs
+        working-directory: terraform/
+        id: terraform_outputs
+        run: |
+
+          terraform output -raw kube_config_b64 > kube_config.b64
+          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" > tf_outputs.env
+          echo "KEY_VAULT_NAME=$(terraform output -raw key_vault_name)" >> tf_outputs.env
+          echo "RESOURCE_GROUP_NAME=$(terraform output -raw resource_group_name)" >> tf_outputs.env
+          echo "AKS_CLUSTER_NAME=$(terraform output -raw aks_cluster_name)" >> tf_outputs.env
+          echo "ACR_NAME=$(terraform output -raw acr_name)" >> tf_outputs.env
+          echo "JWT_SECRET_VALUE=$(terraform output -raw jwt_secret_value)" >> tf_outputs.env
+          echo "tf_outputs.env file created."
+
+      - name: Upload Kubeconfig Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubeconfig
+          path: terraform/kube_config.b64
+          retention-days: 1
+          overwrite: true
+
+      - name: Upload Terraform Outputs Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs
+          path: terraform/tf_outputs.env
+          retention-days: 1
+          overwrite: true
