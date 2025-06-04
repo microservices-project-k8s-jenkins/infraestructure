@@ -1,0 +1,36 @@
+name: Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_location:           ${{ secrets.TF_LOCATION }}
+      TF_VAR_resource_group_name: ${{ secrets.TF_RG_NAME }}
+      TF_VAR_aks_cluster_name:   ${{ secrets.TF_AKS_CLUSTER_NAME }}
+      TF_VAR_acr_name:           ${{ secrets.TF_ACR_NAME }}
+      TF_VAR_key_vault_name:     ${{ secrets.TF_KEYVAULT_NAME }}
+    defaults:
+      run:
+        working-directory: terraform/
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.8.3"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve
