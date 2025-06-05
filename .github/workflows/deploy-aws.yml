@@ -116,33 +116,16 @@ jobs:
             --set extraArgs.max-total-unready-percentage=45 \
             --set extraArgs.max-node-provision-time=15m
 
-
-      - name: Create Default StorageClass for EBS
-        run: |
-          cat <<EOF | kubectl apply -f -
-          apiVersion: storage.k8s.io/v1
-          kind: StorageClass
-          metadata:
-            name: ebs-sc
-            annotations:
-              storageclass.kubernetes.io/is-default-class: "true"
-          provisioner: ebs.csi.aws.com
-          volumeBindingMode: WaitForFirstConsumer
-          reclaimPolicy: Delete
-          allowVolumeExpansion: true
-          EOF
-
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
           helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
             --namespace monitoring \
             --create-namespace \
-            --set grafana.adminPassword='Password@1234' \
+            --set grafana.adminPassword='${{ secrets.GRAFANA_ADMIN_PASSWORD }}' \ # Mejor usar un secreto
             --set grafana.service.type=ClusterIP \
-            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
-            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=2Gi \
-            --set grafana.persistence.enabled=true \
-            --set grafana.persistence.size=5Gi
+            --set prometheus.prometheusSpec.persistentVolume.enabled=false \
+            --set alertmanager.alertmanagerSpec.persistentVolume.enabled=false \
+            --set grafana.persistence.enabled=false
 
       - name: Clone Helm Charts Repository for ArgoCD
         run: |
