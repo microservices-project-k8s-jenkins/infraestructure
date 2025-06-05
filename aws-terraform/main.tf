@@ -106,7 +106,7 @@ resource "aws_security_group" "eks_nodes" {
 resource "aws_eks_cluster" "eks" {
   name     = var.eks_cluster_name
   role_arn = local.lab_role_arn
-  version  = "1.30"
+  version  = "1.29"
 
   vpc_config {
     subnet_ids         = aws_subnet.subnet[*].id

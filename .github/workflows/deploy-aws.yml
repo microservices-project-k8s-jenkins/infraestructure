@@ -118,6 +118,21 @@ jobs:
             --set extraArgs.scale-down-delay-after-delete=10m \
             --set extraArgs.scale-down-delay-after-failure=10m
 
+      - name: Create Default StorageClass for EBS
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: ebs-sc
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+          provisioner: ebs.csi.aws.com
+          volumeBindingMode: WaitForFirstConsumer
+          reclaimPolicy: Delete
+          allowVolumeExpansion: true
+          EOF
+
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
           helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
