@@ -145,8 +145,3 @@ resource "aws_ecr_repository" "ecr" {
     scan_on_push = true
   }
 }
-
-resource "aws_secretsmanager_secret" "secret" {
-  name                    = var.secrets_manager_name
-  recovery_window_in_days = 0
-}

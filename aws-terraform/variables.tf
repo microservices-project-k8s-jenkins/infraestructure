@@ -9,7 +9,3 @@ variable "eks_cluster_name" {
 variable "ecr_name" {
   description = "Name of the ECR repository"
 }
-
-variable "secrets_manager_name" {
-  description = "The name of the Secrets Manager secret"
-}
