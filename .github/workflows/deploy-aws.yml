@@ -101,23 +101,21 @@ jobs:
             --set rbac.create=true \
             --set rbac.serviceAccount.create=true \
             --set rbac.serviceAccount.name=cluster-autoscaler \
+            --set image.repository=registry.k8s.io/autoscaling/cluster-autoscaler \
             --set image.tag=v1.29.0 \
-            --set extraArgs.scale-down-enabled=true \
-            --set extraArgs.scale-down-delay-after-add=10m \
             --set extraArgs.scale-down-unneeded-time=10m \
+            --set extraArgs.scale-down-delay-after-add=15m \
+            --set extraArgs.scale-down-delay-after-delete=1m \
             --set extraArgs.scale-down-utilization-threshold=0.5 \
-            --set extraArgs.skip-nodes-with-local-storage=false \
-            --set extraArgs.skip-nodes-with-system-pods=false \
-            --set extraArgs.max-node-provision-time=15m \
+            --set extraArgs.skip-nodes-with-local-storage=true \
+            --set extraArgs.skip-nodes-with-system-pods=true \
             --set extraArgs.balance-similar-node-groups=true \
             --set extraArgs.expander=least-waste \
-            --set extraArgs.ignore-taint=node.kubernetes.io/not-ready \
-            --set extraArgs.ignore-taint=node.kubernetes.io/unreachable \
-            --set extraArgs.ignore-taint=node.kubernetes.io/unschedulable \
+            --set 'ignoreTaints={node.kubernetes.io/not-ready,node.kubernetes.io/unreachable,node.kubernetes.io/unschedulable}' \
             --set extraArgs.ok-total-unready-count=3 \
             --set extraArgs.max-total-unready-percentage=45 \
-            --set extraArgs.scale-down-delay-after-delete=10m \
-            --set extraArgs.scale-down-delay-after-failure=10m
+            --set extraArgs.max-node-provision-time=15m
+
 
       - name: Create Default StorageClass for EBS
         run: |
