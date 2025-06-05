@@ -117,7 +117,7 @@ jobs:
             --set extraArgs.max-total-unready-percentage=45 \
             --set extraArgs.scale-down-delay-after-delete=10m \
             --set extraArgs.scale-down-delay-after-failure=10m \
-            --set extraArgs.node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/${{ env.EKS_CLUSTER_NAME }}
+            --set extraArgs.node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled\,k8s.io/cluster-autoscaler/${{ env.EKS_CLUSTER_NAME }}
 
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
