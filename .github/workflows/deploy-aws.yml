@@ -48,8 +48,6 @@ jobs:
           echo "SECRETS_MANAGER_NAME=$(terraform output -raw secrets_manager_name)" >> tf_outputs.env
           echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)" >> tf_outputs.env
           echo "REGION=$(terraform output -raw region)" >> tf_outputs.env
-          # Si implementaste IRSA para Cluster Autoscaler, también exportarías ese ARN aquí
-          # echo "CLUSTER_AUTOSCALER_IAM_ROLE_ARN=$(terraform output -raw cluster_autoscaler_iam_role_arn)" >> tf_outputs.env
 
       - name: Upload Terraform Outputs Artifact
         uses: actions/upload-artifact@v4
@@ -59,7 +57,7 @@ jobs:
           retention-days: 1
           overwrite: true
 
-  bootstrap_argocd: # Renombrar a algo como bootstrap_cluster_tools si ArgoCD es solo una parte
+  bootstrap_argocd:
     needs: deploy_infra
     runs-on: ubuntu-latest
     steps:
@@ -103,8 +101,6 @@ jobs:
             --set rbac.create=true \
             --set rbac.serviceAccount.create=true \
             --set rbac.serviceAccount.name=cluster-autoscaler
-            # Si usas IRSA, añade:
-            # --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.CLUSTER_AUTOSCALER_IAM_ROLE_ARN }}"
 
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
@@ -113,13 +109,10 @@ jobs:
             --create-namespace \
             --set grafana.adminPassword='Password@1234' \
             --set grafana.service.type=ClusterIP \
-            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage="" \
-            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName="" \
-            --set prometheus.prometheusSpec.persistentVolume.enabled=false \
-            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage="" \
-            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.storageClassName="" \
-            --set alertmanager.alertmanagerSpec.persistentVolume.enabled=false \
-            --set grafana.persistence.enabled=false
+            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
+            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=2Gi \
+            --set grafana.persistence.enabled=true \
+            --set grafana.persistence.size=5Gi
 
       - name: Clone Helm Charts Repository for ArgoCD
         run: |
