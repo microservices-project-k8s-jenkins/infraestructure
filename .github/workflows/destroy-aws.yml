@@ -1,4 +1,4 @@
-name: Destroy Infrastructure
+name: Destroy Infrastructure of AWS
 
 on:
   workflow_dispatch:
@@ -7,9 +7,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: ${{ secrets.TF_REGION }}
-
   TF_VAR_region:                ${{ secrets.TF_REGION }}
-  TF_VAR_resource_group_name:  ${{ secrets.TF_RG_NAME }}
   TF_VAR_eks_cluster_name:     ${{ secrets.TF_EKS_CLUSTER_NAME }}
   TF_VAR_ecr_name:             ${{ secrets.TF_ECR_NAME }}
   TF_VAR_secrets_manager_name: ${{ secrets.TF_SECRET_NAME }}
