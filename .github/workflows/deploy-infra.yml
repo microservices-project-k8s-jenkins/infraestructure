@@ -107,6 +107,5 @@ jobs:
       - name: Clone Helm Charts Repository
         run: |
           git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
-          cd ecommerce-charts
-          chmod +x scripts/bootstrap.sh
-          ./scripts/bootstrap.sh
+          chmod +x ./ecommerce-charts/scripts/bootstrap.sh
+          ./ecommerce-charts/scripts/bootstrap.sh
