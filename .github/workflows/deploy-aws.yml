@@ -101,6 +101,7 @@ jobs:
             --set rbac.create=true \
             --set rbac.serviceAccount.create=true \
             --set rbac.serviceAccount.name=cluster-autoscaler \
+            --set image.tag=v1.29.0 \
             --set extraArgs.scale-down-enabled=true \
             --set extraArgs.scale-down-delay-after-add=10m \
             --set extraArgs.scale-down-unneeded-time=10m \
