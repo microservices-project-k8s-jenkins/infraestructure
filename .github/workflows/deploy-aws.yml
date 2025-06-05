@@ -45,7 +45,6 @@ jobs:
         working-directory: aws-terraform/
         run: |
           echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" > tf_outputs.env
-          echo "SECRETS_MANAGER_NAME=$(terraform output -raw secrets_manager_name)" >> tf_outputs.env
           echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)" >> tf_outputs.env
           echo "REGION=$(terraform output -raw region)" >> tf_outputs.env
 
@@ -121,7 +120,7 @@ jobs:
           helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
             --namespace monitoring \
             --create-namespace \
-            --set grafana.adminPassword='${{ secrets.GRAFANA_ADMIN_PASSWORD }}' \ # Mejor usar un secreto
+            --set grafana.adminPassword='Password@1234' \
             --set grafana.service.type=ClusterIP \
             --set prometheus.prometheusSpec.persistentVolume.enabled=false \
             --set alertmanager.alertmanagerSpec.persistentVolume.enabled=false \
