@@ -1,4 +1,7 @@
-data "aws_availability_zones" "available" {}
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 data "aws_caller_identity" "current" {}
 
 locals {
@@ -6,31 +9,120 @@ locals {
 }
 
 resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "eks-vpc"
+  }
+}
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "eks-igw"
+  }
 }
 
 resource "aws_subnet" "subnet" {
-  count             = 2
-  cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-  vpc_id            = aws_vpc.main.id
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  count                   = 2
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "eks-subnet-${count.index + 1}"
+  }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "eks-public-rt"
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  count          = 2
+  subnet_id      = aws_subnet.subnet[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_security_group" "eks_cluster" {
+  name_prefix = "eks-cluster-"
+  vpc_id      = aws_vpc.main.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "eks-cluster-sg"
+  }
+}
+
+resource "aws_security_group" "eks_nodes" {
+  name_prefix = "eks-nodes-"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port = 0
+    to_port   = 0
+    protocol  = "-1"
+    self      = true
+  }
+
+  ingress {
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    security_groups = [aws_security_group.eks_cluster.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "eks-nodes-sg"
+  }
 }
 
 resource "aws_eks_cluster" "eks" {
   name     = var.eks_cluster_name
   role_arn = local.lab_role_arn
+  version  = "1.28"
 
   vpc_config {
-    subnet_ids = aws_subnet.subnet[*].id
+    subnet_ids         = aws_subnet.subnet[*].id
+    security_group_ids = [aws_security_group.eks_cluster.id]
+    endpoint_public_access  = true
+    endpoint_private_access = false
   }
+
+  depends_on = [aws_internet_gateway.igw]
 }
 
 resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.eks.name
   node_group_name = "default"
   node_role_arn   = local.lab_role_arn
-
-  subnet_ids = aws_subnet.subnet[*].id
+  subnet_ids      = aws_subnet.subnet[*].id
 
   scaling_config {
     desired_size = 1
@@ -38,13 +130,23 @@ resource "aws_eks_node_group" "node_group" {
     min_size     = 1
   }
 
-  instance_types = ["t3.xlarge"]
+  instance_types = ["t3.medium"]
+  capacity_type  = "ON_DEMAND"
+  ami_type       = "AL2_x86_64"
+
+  depends_on = [aws_eks_cluster.eks]
 }
 
 resource "aws_ecr_repository" "ecr" {
-  name = var.ecr_name
+  name         = var.ecr_name
+  force_delete = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
 }
 
 resource "aws_secretsmanager_secret" "secret" {
-  name = var.secrets_manager_name
+  name                    = var.secrets_manager_name
+  recovery_window_in_days = 0
 }
