@@ -106,7 +106,7 @@ resource "aws_security_group" "eks_nodes" {
 resource "aws_eks_cluster" "eks" {
   name     = var.eks_cluster_name
   role_arn = local.lab_role_arn
-  version  = "1.29"
+  version  = "1.28"
 
   vpc_config {
     subnet_ids         = aws_subnet.subnet[*].id
@@ -132,7 +132,7 @@ resource "aws_eks_node_group" "node_group" {
 
   instance_types = ["t3.xlarge"]
   capacity_type  = "ON_DEMAND"
-  ami_type       = "AL2023_x86_64_STANDARD"
+  ami_type       = "AL2_x86_64"
 
   depends_on = [aws_eks_cluster.eks]
 }
