@@ -132,7 +132,7 @@ resource "aws_eks_node_group" "node_group" {
 
   instance_types = ["t3.xlarge"]
   capacity_type  = "ON_DEMAND"
-  ami_type       = "AL2023_x86_64"
+  ami_type       = "AL2023_x86_64_STANDARD"
 
   depends_on = [aws_eks_cluster.eks]
 }
