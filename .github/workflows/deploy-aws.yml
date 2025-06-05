@@ -26,23 +26,23 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform Init
-        working-directory: terraform/
+        working-directory: aws-terraform/
         run: terraform init
 
       - name: Terraform Validate
-        working-directory: terraform/
+        working-directory: aws-terraform/
         run: terraform validate
 
       - name: Terraform Plan
-        working-directory: terraform/
+        working-directory: aws-terraform/
         run: terraform plan -no-color
 
       - name: Terraform Apply
-        working-directory: terraform/
+        working-directory: aws-terraform/
         run: terraform apply -auto-approve -no-color
 
       - name: Export Terraform Outputs
-        working-directory: terraform/
+        working-directory: aws-terraform/
         run: |
           echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" > tf_outputs.env
           echo "SECRETS_MANAGER_NAME=$(terraform output -raw secrets_manager_name)" >> tf_outputs.env
@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
-          path: terraform/tf_outputs.env
+          path: aws-terraform/tf_outputs.env
           retention-days: 1
           overwrite: true
           

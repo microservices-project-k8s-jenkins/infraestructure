@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/
+        working-directory: aws-terraform/
 
     steps:
       - name: Checkout repository
