@@ -70,17 +70,39 @@ jobs:
           name: terraform-outputs
           path: .
 
+      - name: Load Terraform Outputs into Env Vars
+        run: |
+          cat tf_outputs.env
+          source tf_outputs.env
+          echo "EKS_CLUSTER_NAME=${EKS_CLUSTER_NAME}" >> $GITHUB_ENV
+          echo "REGION=${REGION}" >> $GITHUB_ENV
+
       - name: Configure kubectl for EKS
         run: |
-          source tf_outputs.env
-          aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
+          aws eks update-kubeconfig --region ${{ env.REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
       - name: Install Helm
         uses: azure/setup-helm@v3
         with:
           version: 'latest'
 
-      - name: Clone Helm Charts Repository
+      - name: Add Kubernetes Autoscaler Helm Repo
+        run: helm repo add autoscaler https://kubernetes.github.io/autoscaler
+
+      - name: Update Helm Repos
+        run: helm repo update
+
+      - name: Install Cluster Autoscaler (using Node Role - LabRole)
+        run: |
+          helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
+            --namespace kube-system \
+            --set autoDiscovery.clusterName=${{ env.EKS_CLUSTER_NAME }} \
+            --set awsRegion=${{ env.REGION }} \
+            --set rbac.create=true \
+            --set rbac.serviceAccount.create=true \
+            --set rbac.serviceAccount.name=cluster-autoscaler
+
+      - name: Clone Helm Charts Repository for ArgoCD
         run: |
           git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
           chmod +x ./ecommerce-charts/scripts/bootstrap.sh
