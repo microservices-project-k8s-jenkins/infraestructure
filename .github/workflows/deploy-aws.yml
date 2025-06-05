@@ -45,8 +45,11 @@ jobs:
         working-directory: aws-terraform/
         run: |
           echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" > tf_outputs.env
+          echo "SECRETS_MANAGER_NAME=$(terraform output -raw secrets_manager_name)" >> tf_outputs.env
           echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)" >> tf_outputs.env
           echo "REGION=$(terraform output -raw region)" >> tf_outputs.env
+          # Si implementaste IRSA para Cluster Autoscaler, también exportarías ese ARN aquí
+          # echo "CLUSTER_AUTOSCALER_IAM_ROLE_ARN=$(terraform output -raw cluster_autoscaler_iam_role_arn)" >> tf_outputs.env
 
       - name: Upload Terraform Outputs Artifact
         uses: actions/upload-artifact@v4
@@ -55,8 +58,8 @@ jobs:
           path: aws-terraform/tf_outputs.env
           retention-days: 1
           overwrite: true
-          
-  bootstrap_argocd:
+
+  bootstrap_argocd: # Renombrar a algo como bootstrap_cluster_tools si ArgoCD es solo una parte
     needs: deploy_infra
     runs-on: ubuntu-latest
     steps:
@@ -85,13 +88,13 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Add Kubernetes Autoscaler Helm Repo
-        run: helm repo add autoscaler https://kubernetes.github.io/autoscaler
+      - name: Add Helm Repos
+        run: |
+          helm repo add autoscaler https://kubernetes.github.io/autoscaler
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
 
-      - name: Update Helm Repos
-        run: helm repo update
-
-      - name: Install Cluster Autoscaler (using Node Role - LabRole)
+      - name: Install Cluster Autoscaler
         run: |
           helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
             --namespace kube-system \
@@ -100,9 +103,28 @@ jobs:
             --set rbac.create=true \
             --set rbac.serviceAccount.create=true \
             --set rbac.serviceAccount.name=cluster-autoscaler
+            # Si usas IRSA, añade:
+            # --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.CLUSTER_AUTOSCALER_IAM_ROLE_ARN }}"
+
+      - name: Install Prometheus and Grafana (kube-prometheus-stack)
+        run: |
+          helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --create-namespace \
+            --set grafana.adminPassword='Password@1234' \
+            --set grafana.service.type=ClusterIP \
+            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage="" \
+            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName="" \
+            --set prometheus.prometheusSpec.persistentVolume.enabled=false \
+            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage="" \
+            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.storageClassName="" \
+            --set alertmanager.alertmanagerSpec.persistentVolume.enabled=false \
+            --set grafana.persistence.enabled=false
 
       - name: Clone Helm Charts Repository for ArgoCD
         run: |
           git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
           chmod +x ./ecommerce-charts/scripts/bootstrap.sh
+          echo "Waiting for monitoring pods to be ready..."
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kube-prometheus-stack -n monitoring --timeout=300s || echo "Timeout waiting for monitoring pods, continuing..."
           ./ecommerce-charts/scripts/bootstrap.sh
