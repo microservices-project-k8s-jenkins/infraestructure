@@ -75,3 +75,38 @@ jobs:
           path: terraform/tf_outputs.env
           retention-days: 1
           overwrite: true
+          
+  bootstrap_argocd:
+    needs: deploy_infra
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+  
+      - name: Download Kubeconfig Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kubeconfig
+          path: .
+  
+      - name: Decode kube_config and configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          base64 -d kube_config.b64 > ~/.kube/config
+  
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+  
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+  
+      - name: Clone Helm Charts Repository
+        run: |
+          git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
+          cd ecommerce-charts
+          chmod +x scripts/bootstrap.sh
+          ./scripts/bootstrap.sh
