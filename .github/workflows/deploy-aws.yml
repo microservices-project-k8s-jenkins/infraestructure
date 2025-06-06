@@ -134,6 +134,13 @@ jobs:
             --create-namespace \
             --set installCRDs=true
 
+      - name: Install ECK Stack with Logstash
+        run: |
+          helm upgrade --install eck-stack-with-logstash elastic/eck-stack \
+          --values https://raw.githubusercontent.com/elastic/cloud-on-k8s/3.0/deploy/eck-stack/examples/logstash/basic-eck.yaml \
+          --namespace elastic-stack \
+          --create-namespace
+
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
           helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
