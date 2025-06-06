@@ -71,11 +71,8 @@ jobs:
 
           kubectl delete ingress --all --all-namespaces
           kubectl delete service --all --all-namespaces --field-selector spec.type=LoadBalancer
-          
-          echo "Paso 3: Esperando 5 minutos para que los controladores de AWS eliminen los Load Balancers y ENIs..."
-          sleep 300
 
-          echo "Limpieza de Kubernetes finalizada."
+          sleep 300
 
       - name: Terraform Destroy
         id: destroy
