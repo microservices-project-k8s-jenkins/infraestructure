@@ -151,10 +151,15 @@ jobs:
           helm repo add elastic https://helm.elastic.co
           helm repo update
 
+          curl -o basic-eck.yaml https://raw.githubusercontent.com/elastic/cloud-on-k8s/3.0/deploy/eck-stack/examples/logstash/basic-eck.yaml
+          
+          sed -i '/daemonSet: null/d' basic-eck.yaml
+          
           helm upgrade --install eck-stack-with-logstash elastic/eck-stack \
-          --values https://raw.githubusercontent.com/elastic/cloud-on-k8s/3.0/deploy/eck-stack/examples/logstash/basic-eck.yaml \
-          --namespace elastic-stack \
-          --create-namespace
+            --values basic-eck.yaml \
+            --namespace elastic-stack \
+            --create-namespace \
+            --wait
 
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
