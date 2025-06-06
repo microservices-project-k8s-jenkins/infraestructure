@@ -53,13 +53,26 @@ jobs:
           aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME || true
 
           echo "Deleting Kubernetes resources..."
-          kubectl delete ingress --all -A || true
-          kubectl delete svc --all -A || true
-          kubectl delete deployment --all -A || true
-          kubectl delete statefulset --all -A || true
-          kubectl delete daemonset --all -A || true
-          kubectl delete pods --all -A || true
-          kubectl delete pvc --all -A || true
+          helm uninstall eck-stack-with-logstash -n elastic-stack || true
+          helm uninstall elastic-operator -n elastic-system || true
+          helm uninstall ingress-nginx -n ingress-nginx || true
+          helm uninstall cert-manager -n cert-manager || true
+          helm uninstall kube-prometheus-stack -n monitoring || true
+          helm uninstall cluster-autoscaler -n kube-system || true
+
+          kubectl delete all --all -A --force --grace-period=0 || true
+          kubectl delete pvc --all -A --force --grace-period=0 || true
+          kubectl delete crd --all --force --grace-period=0 || true
+
+          echo "Force deleting critical namespaces (may hang otherwise)..."
+          kubectl delete ns elastic-stack elastic-system monitoring ingress-nginx cert-manager --force --grace-period=0 || true
+
+          echo "Strip finalizers to avoid stuck Terminating state"
+          kubectl get namespaces -o json | jq '.items[].metadata.name' -r | while read ns; do
+            kubectl get all -n "$ns" -o name | while read res; do
+              kubectl patch "$res" -n "$ns" -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+            done
+          done
 
           echo "Waiting for AWS to clean up ENIs and Load Balancers..."
           sleep 180
