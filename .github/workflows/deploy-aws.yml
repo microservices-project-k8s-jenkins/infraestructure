@@ -136,6 +136,9 @@ jobs:
 
       - name: Install ECK Stack with Logstash
         run: |
+          helm repo add elastic https://helm.elastic.co
+          helm repo update
+
           helm upgrade --install eck-stack-with-logstash elastic/eck-stack \
           --values https://raw.githubusercontent.com/elastic/cloud-on-k8s/3.0/deploy/eck-stack/examples/logstash/basic-eck.yaml \
           --namespace elastic-stack \
