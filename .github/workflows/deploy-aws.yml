@@ -134,8 +134,20 @@ jobs:
             --create-namespace \
             --set installCRDs=true
 
+
+      - name: Install ECK Operator
+        run: |
+          helm repo add elastic https://helm.elastic.co
+          helm repo update
+          
+          helm upgrade --install elastic-operator elastic/eck-operator \
+            --namespace elastic-system \
+            --create-namespace \
+            --wait
+
       - name: Install ECK Stack with Logstash
         run: |
+          sleep 30
           helm repo add elastic https://helm.elastic.co
           helm repo update
 
