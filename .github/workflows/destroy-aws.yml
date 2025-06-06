@@ -1,22 +1,25 @@
-name: Destroy Infrastructure of AWS
+# Nombre del workflow
+name: Destroy AWS Infrastructure
 
+# Se activa manualmente desde la interfaz de GitHub Actions
 on:
   workflow_dispatch:
 
+# Variables de entorno para AWS y Terraform, usando secrets de GitHub
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
   AWS_DEFAULT_REGION: ${{ secrets.TF_REGION }}
-  TF_VAR_region:                ${{ secrets.TF_REGION }}
-  TF_VAR_eks_cluster_name:     ${{ secrets.TF_EKS_CLUSTER_NAME }}
-  TF_VAR_ecr_name:             ${{ secrets.TF_ECR_NAME }}
+  TF_VAR_region: ${{ secrets.TF_REGION }}
+  TF_VAR_eks_cluster_name: ${{ secrets.TF_EKS_CLUSTER_NAME }}
+  TF_VAR_ecr_name: ${{ secrets.TF_ECR_NAME }}
   TF_VAR_secrets_manager_name: ${{ secrets.TF_SECRET_NAME }}
 
 jobs:
   destroy:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,10 +30,12 @@ jobs:
           terraform_version: "1.8.3"
 
       - name: Terraform Init
+        id: init
         working-directory: aws-terraform/
         run: terraform init
 
       - name: Export Terraform Outputs
+        id: tf-outputs
         working-directory: aws-terraform/
         run: |
           echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name || echo '')" >> $GITHUB_ENV
@@ -39,20 +44,24 @@ jobs:
       - name: Check if EKS Cluster Exists
         id: check_cluster
         run: |
+          # Verifica si la variable EKS_CLUSTER_NAME está vacía
+          if [ -z "$EKS_CLUSTER_NAME" ]; then
+            echo "exists=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
           if aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $REGION >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
-            echo "EKS cluster does not exist. Skipping Kubernetes cleanup."
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Configure kubectl and clean up Kubernetes resources
+      - name: Graceful Kubernetes Cleanup
+        # Este paso solo se ejecuta si el cluster existe
         if: steps.check_cluster.outputs.exists == 'true'
         run: |
-          echo "Configuring kubectl..."
-          aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME || true
+          aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
 
-          echo "Deleting Kubernetes resources..."
           helm uninstall eck-stack-with-logstash -n elastic-stack || true
           helm uninstall elastic-operator -n elastic-system || true
           helm uninstall ingress-nginx -n ingress-nginx || true
@@ -60,23 +69,15 @@ jobs:
           helm uninstall kube-prometheus-stack -n monitoring || true
           helm uninstall cluster-autoscaler -n kube-system || true
 
-          kubectl delete all --all -A --force --grace-period=0 || true
-          kubectl delete pvc --all -A --force --grace-period=0 || true
-          kubectl delete crd --all --force --grace-period=0 || true
+          kubectl delete ingress --all --all-namespaces
+          kubectl delete service --all --all-namespaces --field-selector spec.type=LoadBalancer
+          
+          echo "Paso 3: Esperando 5 minutos para que los controladores de AWS eliminen los Load Balancers y ENIs..."
+          sleep 300
 
-          echo "Force deleting critical namespaces (may hang otherwise)..."
-          kubectl delete ns elastic-stack elastic-system monitoring ingress-nginx cert-manager --force --grace-period=0 || true
-
-          echo "Strip finalizers to avoid stuck Terminating state"
-          kubectl get namespaces -o json | jq '.items[].metadata.name' -r | while read ns; do
-            kubectl get all -n "$ns" -o name | while read res; do
-              kubectl patch "$res" -n "$ns" -p '{"metadata":{"finalizers":[]}}' --type=merge || true
-            done
-          done
-
-          echo "Waiting for AWS to clean up ENIs and Load Balancers..."
-          sleep 180
+          echo "Limpieza de Kubernetes finalizada."
 
       - name: Terraform Destroy
+        id: destroy
         working-directory: aws-terraform/
         run: terraform destroy -auto-approve
