@@ -56,17 +56,25 @@ jobs:
         if: steps.check_cluster.outputs.exists == 'true'
         run: |
           aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
-
+          
           helm uninstall eck-stack-with-logstash -n elastic-stack || true
           helm uninstall elastic-operator -n elastic-system || true
           helm uninstall ingress-nginx -n ingress-nginx || true
           helm uninstall cert-manager -n cert-manager || true
           helm uninstall kube-prometheus-stack -n monitoring || true
           helm uninstall cluster-autoscaler -n kube-system || true
-
+          
           kubectl delete ingress --all --all-namespaces
-          kubectl delete service --all-namespaces --field-selector spec.type=LoadBalancer
+          kubectl wait --for=delete ingress --all --all-namespaces --timeout=5m || true
 
+          kubectl get services --all-namespaces -o json | \
+          jq -r '.items[] | select(.spec.type=="LoadBalancer") | .metadata.namespace + " " + .metadata.name' | \
+          while read -r namespace name; do
+            if [ -n "$namespace" ] && [ -n "$name" ]; then
+              kubectl delete service "$name" -n "$namespace"
+            fi
+          done
+          
           sleep 300
 
       - name: Terraform Destroy
