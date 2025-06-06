@@ -147,19 +147,19 @@ jobs:
 
       - name: Install ECK Stack with Logstash
         run: |
-          sleep 30
-          helm repo add elastic https://helm.elastic.co
-          helm repo update
-
-          curl -o basic-eck.yaml https://raw.githubusercontent.com/elastic/cloud-on-k8s/3.0/deploy/eck-stack/examples/logstash/basic-eck.yaml
-          
+          kubectl wait --for condition=Established crd/elasticsearches.elasticsearch.k8s.elastic.co --timeout=120s || true
+          kubectl wait --for condition=Established crd/kibanas.kibana.k8s.elastic.co --timeout=120s || true
+          kubectl wait --for condition=Established crd/logstashes.logstash.k8s.elastic.co --timeout=120s || true
+          kubectl wait --for condition=Established crd/beats.beat.k8s.elastic.co --timeout=120s || true
+          curl -sSfL -o basic-eck.yaml https://raw.githubusercontent.com/elastic/cloud-on-k8s/3.0/deploy/eck-stack/examples/logstash/basic-eck.yaml
           sed -i '/daemonSet: null/d' basic-eck.yaml
-          
+          sed -i 's/type: log/type: filestream/g' basic-eck.yaml
           helm upgrade --install eck-stack-with-logstash elastic/eck-stack \
             --values basic-eck.yaml \
             --namespace elastic-stack \
             --create-namespace \
             --wait
+
 
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
