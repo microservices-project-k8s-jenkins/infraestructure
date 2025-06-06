@@ -115,6 +115,12 @@ jobs:
             --set extraArgs.max-total-unready-percentage=45 \
             --set extraArgs.max-node-provision-time=15m
 
+      - name: Install AWS EBS CSI Driver
+        run: |
+          git clone https://github.com/kubernetes-sigs/aws-ebs-csi-driver.git
+          cd aws-ebs-csi-driver
+          kubectl apply -k deploy/kubernetes/overlays/stable
+
       - name: Install Ingress Controller
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
