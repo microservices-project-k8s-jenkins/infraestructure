@@ -16,9 +16,6 @@ env:
 jobs:
   destroy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: aws-terraform/
 
     steps:
       - name: Checkout repository
@@ -30,7 +27,43 @@ jobs:
           terraform_version: "1.8.3"
 
       - name: Terraform Init
+        working-directory: aws-terraform/
         run: terraform init
 
+      - name: Export Terraform Outputs
+        working-directory: aws-terraform/
+        run: |
+          echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name || echo '')" >> $GITHUB_ENV
+          echo "REGION=$(terraform output -raw region || echo '${{ secrets.TF_REGION }}')" >> $GITHUB_ENV
+
+      - name: Check if EKS Cluster Exists
+        id: check_cluster
+        run: |
+          if aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $REGION >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "EKS cluster does not exist. Skipping Kubernetes cleanup."
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure kubectl and clean up Kubernetes resources
+        if: steps.check_cluster.outputs.exists == 'true'
+        run: |
+          echo "Configuring kubectl..."
+          aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME || true
+
+          echo "Deleting Kubernetes resources..."
+          kubectl delete ingress --all -A || true
+          kubectl delete svc --all -A || true
+          kubectl delete deployment --all -A || true
+          kubectl delete statefulset --all -A || true
+          kubectl delete daemonset --all -A || true
+          kubectl delete pods --all -A || true
+          kubectl delete pvc --all -A || true
+
+          echo "Waiting for AWS to clean up ENIs and Load Balancers..."
+          sleep 180
+
       - name: Terraform Destroy
+        working-directory: aws-terraform/
         run: terraform destroy -auto-approve
