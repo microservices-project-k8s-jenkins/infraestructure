@@ -148,6 +148,7 @@ resource "aws_ecr_repository" "ecr" {
 
 resource "aws_secretsmanager_secret" "frontend_secret" {
   name = "${var.eks_cluster_name}-frontend-secret"
+  recovery_window_in_days = 0
   tags = {
     Name = "Frontend Secret"
   }
