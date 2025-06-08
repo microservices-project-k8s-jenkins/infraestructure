@@ -124,8 +124,7 @@ jobs:
             projectcalico/tigera-operator \
             --namespace tigera-operator \
             --create-namespace \
-            --set installation.calicoNetwork.linuxDataplane="none" \
-            --set installation.calicoNetwork.containerProvider="none" \
+            --set installation.calicoNetwork.linuxDataplane="Iptables" \
             --set installation.kubernetesProvider="EKS"
             
       - name: Install Metrics server for HPA
