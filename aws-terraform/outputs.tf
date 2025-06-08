@@ -9,7 +9,3 @@ output "ecr_repository_url" {
 output "region" {
   value = var.region
 }
-
-output "frontend_secret_name" {
-  value = aws_secretsmanager_secret.frontend_secret.name
-}
