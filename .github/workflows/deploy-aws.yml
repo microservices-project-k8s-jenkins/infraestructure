@@ -115,6 +115,27 @@ jobs:
             --set extraArgs.max-total-unready-percentage=45 \
             --set extraArgs.max-node-provision-time=15m
 
+      - name: Install Calico for Network Policies
+        run: |
+          helm repo add projectcalico https://docs.tigera.io/calico/charts
+          helm repo update
+          
+          helm upgrade --install calico \
+            projectcalico/tigera-operator \
+            --namespace tigera-operator \
+            --create-namespace \
+            --set installation.calicoNetwork.linuxDataplane="none" \
+            --set installation.calicoNetwork.containerProvider="none" \
+            --set installation.kubernetesProvider="EKS"
+            
+      - name: Install Metrics server for HPA
+        run: |
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo update
+          
+          helm upgrade --install metrics-server metrics-server/metrics-server \
+            --namespace kube-system
+
       - name: Install AWS EBS CSI Driver
         run: |
           git clone https://github.com/kubernetes-sigs/aws-ebs-csi-driver.git
@@ -140,7 +161,6 @@ jobs:
             --create-namespace \
             --set installCRDs=true
 
-
       - name: Install ECK Operator
         run: |
           helm repo add elastic https://helm.elastic.co
@@ -165,7 +185,6 @@ jobs:
             --namespace elastic-stack \
             --create-namespace \
             --wait
-
 
       - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
