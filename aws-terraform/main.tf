@@ -145,3 +145,16 @@ resource "aws_ecr_repository" "ecr" {
     scan_on_push = true
   }
 }
+
+resource "aws_secretsmanager_secret" "frontend_secret" {
+  name = "${var.eks_cluster_name}-frontend-secret"
+  recovery_window_in_days = 0
+  tags = {
+    Name = "Frontend Secret"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "frontend_secret_value" {
+  secret_id     = aws_secretsmanager_secret.frontend_secret.id
+  secret_string = var.frontend_secret_text
+}
