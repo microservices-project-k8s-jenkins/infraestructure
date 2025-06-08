@@ -11,6 +11,7 @@ env:
   TF_VAR_region:                ${{ secrets.TF_REGION }}
   TF_VAR_eks_cluster_name:     ${{ secrets.TF_EKS_CLUSTER_NAME }}
   TF_VAR_ecr_name:             ${{ secrets.TF_ECR_NAME }}
+  TF_VAR_frontend_secret_text: ${{ secrets.FRONTEND_SECRET_TEXT }}
 
 jobs:
   deploy_infra:
@@ -47,6 +48,7 @@ jobs:
           echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" > tf_outputs.env
           echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)" >> tf_outputs.env
           echo "REGION=$(terraform output -raw region)" >> tf_outputs.env
+          echo "FRONTEND_SECRET_NAME=$(terraform output -raw frontend_secret_name)" >> tf_outputs.env
 
       - name: Upload Terraform Outputs Artifact
         uses: actions/upload-artifact@v4
@@ -75,6 +77,7 @@ jobs:
           source tf_outputs.env
           echo "EKS_CLUSTER_NAME=${EKS_CLUSTER_NAME}" >> $GITHUB_ENV
           echo "REGION=${REGION}" >> $GITHUB_ENV
+          echo "FRONTEND_SECRET_NAME=${FRONTEND_SECRET_NAME}" >> $GITHUB_ENV
 
       - name: Configure kubectl for EKS
         run: |
@@ -198,8 +201,12 @@ jobs:
 
       - name: Clone Helm Charts Repository for ArgoCD
         run: |
+          echo "Fetching secret from AWS Secrets Manager..."
+          SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id "${{ env.FRONTEND_SECRET_NAME }}" --region "${{ env.REGION }}" --query SecretString --output text)
           git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
           chmod +x ./ecommerce-charts/scripts/bootstrap.sh
           echo "Waiting for monitoring pods to be ready..."
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kube-prometheus-stack -n monitoring --timeout=300s || echo "Timeout waiting for monitoring pods, continuing..."
+          echo "Injecting secret into values.yaml..."
+          sed -i "s|SECRET_TEXT:.*|SECRET_TEXT: ${SECRET_VALUE}|" ./ecommerce-charts/values.yaml
           ./ecommerce-charts/scripts/bootstrap.sh
