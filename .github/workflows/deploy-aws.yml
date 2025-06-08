@@ -208,5 +208,5 @@ jobs:
           echo "Waiting for monitoring pods to be ready..."
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kube-prometheus-stack -n monitoring --timeout=300s || echo "Timeout waiting for monitoring pods, continuing..."
           echo "Injecting secret into values.yaml..."
-          sed -i "s|SECRET_TEXT:.*|SECRET_TEXT: ${SECRET_VALUE}|" ./ecommerce-charts/values.yaml
+          sed -i "s|SECRET_TEXT:.*|SECRET_TEXT: ${SECRET_VALUE}|" ./ecommerce-charts/charts/ecommerce/values.yaml
           ./ecommerce-charts/scripts/bootstrap.sh
