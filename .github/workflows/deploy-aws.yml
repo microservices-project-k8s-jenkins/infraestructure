@@ -202,7 +202,7 @@ jobs:
       - name: Clone Helm Charts Repository for ArgoCD
         run: |
           echo "Fetching secret from AWS Secrets Manager..."
-          SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id "${{ env.FRONTEND_SECRET_NAME }}" --region "${{ env.REGION }}" --query SecretString --output text)
+          SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id "$FRONTEND_SECRET_NAME" --region "$REGION" --query SecretString --output text)
           git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
           chmod +x ./ecommerce-charts/scripts/bootstrap.sh
           echo "Waiting for monitoring pods to be ready..."
