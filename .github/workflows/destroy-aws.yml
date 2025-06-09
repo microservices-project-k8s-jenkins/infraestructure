@@ -11,7 +11,6 @@ env:
   TF_VAR_region: ${{ secrets.TF_REGION }}
   TF_VAR_eks_cluster_name: ${{ secrets.TF_EKS_CLUSTER_NAME }}
   TF_VAR_ecr_name: ${{ secrets.TF_ECR_NAME }}
-  TF_VAR_secrets_manager_name: ${{ secrets.TF_SECRET_NAME }}
 
 jobs:
   destroy:
