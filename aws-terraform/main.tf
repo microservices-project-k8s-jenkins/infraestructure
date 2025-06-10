@@ -109,13 +109,31 @@ resource "aws_eks_cluster" "eks" {
   version  = "1.28"
 
   vpc_config {
-    subnet_ids         = aws_subnet.subnet[*].id
-    security_group_ids = [aws_security_group.eks_cluster.id]
+    subnet_ids              = aws_subnet.subnet[*].id
+    security_group_ids      = [aws_security_group.eks_cluster.id]
     endpoint_public_access  = true
     endpoint_private_access = false
   }
 
   depends_on = [aws_internet_gateway.igw]
+}
+
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name   = "vpc-cni"
+  addon_version = "v1.15.1-eksbuild.1"
+  
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  configuration_values = jsonencode({
+    env = {
+      ENABLE_PREFIX_DELEGATION = "true",
+      WARM_PREFIX_TARGET       = "1"
+    }
+  })
+
+  depends_on = [aws_eks_cluster.eks]
 }
 
 resource "aws_eks_node_group" "node_group" {
@@ -130,11 +148,11 @@ resource "aws_eks_node_group" "node_group" {
     min_size     = 1
   }
 
-  instance_types = ["t3.xlarge"]
+  instance_types = ["t3.large"]
   capacity_type  = "ON_DEMAND"
   ami_type       = "AL2_x86_64"
 
-  depends_on = [aws_eks_cluster.eks]
+  depends_on = [aws_eks_addon.vpc_cni]
 }
 
 resource "aws_ecr_repository" "ecr" {
