@@ -110,7 +110,6 @@ jobs:
             --set extraArgs.skip-nodes-with-system-pods=true \
             --set extraArgs.balance-similar-node-groups=true \
             --set extraArgs.expander=least-waste \
-            --set 'ignoreTaints={node.kubernetes.io/not-ready,node.kubernetes.io/unreachable,node.kubernetes.io/unschedulable}' \
             --set extraArgs.ok-total-unready-count=3 \
             --set extraArgs.max-total-unready-percentage=45 \
             --set extraArgs.max-node-provision-time=15m
@@ -120,12 +119,11 @@ jobs:
           helm repo add projectcalico https://docs.tigera.io/calico/charts
           helm repo update
           
-          helm upgrade --install calico \
-            projectcalico/tigera-operator \
+          helm upgrade --install calico projectcalico/tigera-operator \
             --namespace tigera-operator \
             --create-namespace \
-            --set installation.calicoNetwork.linuxDataplane="Iptables" \
-            --set installation.kubernetesProvider="EKS"
+            --set installation.cni.type=AmazonVPC \
+            --set installation.calicoNetwork.nodeAddressAutodetectionV4.interface="eth0"
             
       - name: Install Metrics server for HPA
         run: |
