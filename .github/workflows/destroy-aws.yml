@@ -74,7 +74,7 @@ jobs:
             fi
           done
           
-          sleep 300
+          sleep 60
 
       - name: Terraform Destroy
         id: destroy
