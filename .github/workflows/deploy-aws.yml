@@ -101,7 +101,7 @@ jobs:
             --set rbac.serviceAccount.create=true \
             --set rbac.serviceAccount.name=cluster-autoscaler \
             --set image.repository=registry.k8s.io/autoscaling/cluster-autoscaler \
-            --set image.tag=v1.28.0 \
+            --set image.tag=v1.30.4 \
             --set extraArgs.scale-down-unneeded-time=10m \
             --set extraArgs.scale-down-delay-after-add=15m \
             --set extraArgs.scale-down-delay-after-delete=1m \
