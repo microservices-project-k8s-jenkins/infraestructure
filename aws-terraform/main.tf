@@ -118,24 +118,6 @@ resource "aws_eks_cluster" "eks" {
   depends_on = [aws_internet_gateway.igw]
 }
 
-resource "aws_eks_addon" "vpc_cni" {
-  cluster_name = aws_eks_cluster.eks.name
-  addon_name   = "vpc-cni"
-  addon_version = "v1.19.0-eksbuild.1"
-  
-  resolve_conflicts_on_create = "OVERWRITE"
-  resolve_conflicts_on_update = "OVERWRITE"
-
-  configuration_values = jsonencode({
-    env = {
-      ENABLE_PREFIX_DELEGATION = "true",
-      WARM_PREFIX_TARGET       = "1"
-    }
-  })
-
-  depends_on = [aws_eks_cluster.eks]
-}
-
 resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.eks.name
   node_group_name = "default"
@@ -144,11 +126,11 @@ resource "aws_eks_node_group" "node_group" {
 
   scaling_config {
     desired_size = 1
-    max_size     = 4
+    max_size     = 10
     min_size     = 1
   }
 
-  instance_types = ["t3.xlarge"]
+  instance_types = ["t3.medium"]
   capacity_type  = "ON_DEMAND"
   ami_type       = "AL2_x86_64"
 
@@ -162,8 +144,6 @@ resource "aws_eks_node_group" "node_group" {
       scaling_config[0].desired_size,
     ]
   }
-
-  depends_on = [aws_eks_addon.vpc_cni]
 }
 
 resource "aws_ecr_repository" "ecr" {
