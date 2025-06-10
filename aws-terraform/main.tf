@@ -152,6 +152,13 @@ resource "aws_eks_node_group" "node_group" {
   capacity_type  = "ON_DEMAND"
   ami_type       = "AL2_x86_64"
 
+  lifecycle {
+    ignore_changes = [
+      scaling_config[0].desired_size,
+    ]
+  }
+
+
   depends_on = [aws_eks_addon.vpc_cni]
 }
 
