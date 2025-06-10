@@ -152,13 +152,17 @@ resource "aws_eks_node_group" "node_group" {
   capacity_type  = "ON_DEMAND"
   ami_type       = "AL2023_x86_64_STANDARD"
 
+  tags = {
+    "k8s.io/cluster-autoscaler/enabled" = "true"
+    "k8s.io/cluster-autoscaler/${var.eks_cluster_name}" = "owned"
+  }
+
   lifecycle {
     ignore_changes = [
       scaling_config[0].desired_size,
     ]
   }
-
-
+  
   depends_on = [aws_eks_addon.vpc_cni]
 }
 
