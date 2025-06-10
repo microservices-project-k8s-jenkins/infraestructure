@@ -56,7 +56,7 @@ jobs:
           retention-days: 1
           overwrite: true
 
-  bootstrap_argocd:
+  bootstrap_cluster:
     needs: deploy_infra
     runs-on: ubuntu-latest
     steps:
@@ -90,29 +90,6 @@ jobs:
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo update
-
-      - name: Install Cluster Autoscaler
-        run: |
-          helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
-            --namespace kube-system \
-            --set autoDiscovery.clusterName=${{ env.EKS_CLUSTER_NAME }} \
-            --set awsRegion=${{ env.REGION }} \
-            --set rbac.create=true \
-            --set rbac.serviceAccount.create=true \
-            --set rbac.serviceAccount.name=cluster-autoscaler \
-            --set image.repository=registry.k8s.io/autoscaling/cluster-autoscaler \
-            --set image.tag=v1.28.2 \
-            --set extraArgs.scale-down-unneeded-time=10m \
-            --set extraArgs.scale-down-delay-after-add=15m \
-            --set extraArgs.scale-down-delay-after-delete=1m \
-            --set extraArgs.scale-down-utilization-threshold=0.5 \
-            --set extraArgs.skip-nodes-with-local-storage=true \
-            --set extraArgs.skip-nodes-with-system-pods=true \
-            --set extraArgs.balance-similar-node-groups=true \
-            --set extraArgs.expander=least-waste \
-            --set extraArgs.ok-total-unready-count=3 \
-            --set extraArgs.max-total-unready-percentage=45 \
-            --set extraArgs.max-node-provision-time=15m
 
       - name: Install Calico for Network Policies
         run: |
@@ -199,6 +176,4 @@ jobs:
           echo "Fetching secret from AWS Secrets Manager..."
           git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
           chmod +x ./ecommerce-charts/scripts/bootstrap.sh
-          echo "Waiting for monitoring pods to be ready..."
-          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kube-prometheus-stack -n monitoring --timeout=300s || echo "Timeout waiting for monitoring pods, continuing..."
           ./ecommerce-charts/scripts/bootstrap.sh

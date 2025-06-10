@@ -125,12 +125,12 @@ resource "aws_eks_node_group" "node_group" {
   subnet_ids      = aws_subnet.subnet[*].id
 
   scaling_config {
-    desired_size = 1
-    max_size     = 10
-    min_size     = 1
+    desired_size = 4
+    max_size     = 4
+    min_size     = 4
   }
 
-  instance_types = ["t3.medium"]
+  instance_types = ["t3.large"]
   capacity_type  = "ON_DEMAND"
   ami_type       = "AL2_x86_64"
 
