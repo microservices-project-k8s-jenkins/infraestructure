@@ -145,3 +145,52 @@ resource "aws_eks_node_group" "node_group" {
     ]
   }
 }
+
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name             = aws_eks_cluster.eks.name
+  addon_name               = "vpc-cni"
+  addon_version = "v1.19.0-eksbuild.1"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+  
+  configuration_values = jsonencode({
+    env = {
+      ENABLE_PREFIX_DELEGATION = "true"
+      WARM_PREFIX_TARGET = "1"
+    }
+  })
+
+  depends_on = [aws_eks_node_group.node_group]
+
+  tags = {
+    Name = "vpc-cni-addon"
+  }
+}
+
+resource "aws_eks_addon" "coredns" {
+  cluster_name      = aws_eks_cluster.eks.name
+  addon_name        = "coredns"
+  addon_version     = "v1.10.1-eksbuild.7"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_node_group.node_group]
+
+  tags = {
+    Name = "coredns-addon"
+  }
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name      = aws_eks_cluster.eks.name
+  addon_name        = "kube-proxy"
+  addon_version     = "v1.28.8-eksbuild.5"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_node_group.node_group]
+
+  tags = {
+    Name = "kube-proxy-addon"
+  }
+}
