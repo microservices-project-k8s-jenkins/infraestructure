@@ -86,7 +86,7 @@ jobs:
           aws eks update-kubeconfig --region ${{ needs.deploy_infra.outputs.region }} --name ${{ needs.deploy_infra.outputs.eks_cluster_name }}
 
       - name: Install Helm
-        uses: azure/setup-helm@v4  # Updated version
+        uses: azure/setup-helm@v4
         with:
           version: 'latest'
 
@@ -103,22 +103,6 @@ jobs:
       - name: Wait for cluster to be ready
         run: |
           kubectl wait --for=condition=Ready nodes --all --timeout=300s
-
-      - name: Install AWS Load Balancer Controller (Recommended over plain ingress)
-        run: |
-          # Download IAM policy
-          curl -o iam-policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.8.1/docs/install/iam_policy.json
-          
-          # Install AWS Load Balancer Controller
-          helm repo add eks https://aws.github.io/eks-charts
-          helm repo update
-          
-          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-            -n kube-system \
-            --set clusterName=${{ needs.deploy_infra.outputs.eks_cluster_name }} \
-            --set serviceAccount.create=false \
-            --set serviceAccount.name=aws-load-balancer-controller \
-            --wait
 
       - name: Install Metrics Server
         run: |
