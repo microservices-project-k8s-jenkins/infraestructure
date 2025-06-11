@@ -158,7 +158,7 @@ resource "aws_eks_addon" "vpc_cni" {
     env = {
       ENABLE_PREFIX_DELEGATION = "true"
       WARM_PREFIX_TARGET = "1"
-      ENABLE_IPv4 = "true"
+      WARM_IP_TARGET = "3"
     }
   })
 
