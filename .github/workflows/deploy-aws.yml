@@ -221,4 +221,4 @@ jobs:
           kubectl get pods -n ingress-nginx
           
           echo "=== Load Balancer External IPs ==="
-          kubectl get svc -n ingress-nginx --field-selector spec.type=LoadBalancer
+          kubectl get svc -n ingress-nginx
