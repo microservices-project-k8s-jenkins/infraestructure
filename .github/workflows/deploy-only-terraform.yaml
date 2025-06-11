@@ -10,7 +10,6 @@ env:
   AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
   TF_VAR_region:                ${{ secrets.TF_REGION }}
   TF_VAR_eks_cluster_name:     ${{ secrets.TF_EKS_CLUSTER_NAME }}
-  TF_VAR_ecr_name:             ${{ secrets.TF_ECR_NAME }}
 
 jobs:
   deploy_infra:
@@ -44,7 +43,6 @@ jobs:
       - name: Export Terraform Outputs
         working-directory: aws-terraform/
         run: |
-          echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" > tf_outputs.env
           echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)" >> tf_outputs.env
           echo "REGION=$(terraform output -raw region)" >> tf_outputs.env
 

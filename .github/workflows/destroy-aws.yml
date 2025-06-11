@@ -10,7 +10,6 @@ env:
   AWS_DEFAULT_REGION: ${{ secrets.TF_REGION }}
   TF_VAR_region: ${{ secrets.TF_REGION }}
   TF_VAR_eks_cluster_name: ${{ secrets.TF_EKS_CLUSTER_NAME }}
-  TF_VAR_ecr_name: ${{ secrets.TF_ECR_NAME }}
 
 jobs:
   destroy:
