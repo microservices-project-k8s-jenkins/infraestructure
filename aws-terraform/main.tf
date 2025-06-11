@@ -146,11 +146,53 @@ resource "aws_eks_node_group" "node_group" {
   }
 }
 
-resource "aws_ecr_repository" "ecr" {
-  name         = var.ecr_name
-  force_delete = true
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name             = aws_eks_cluster.eks.name
+  addon_name               = "vpc-cni"
+  addon_version            = "v1.18.1-eksbuild.1"  # Versión compatible con EKS 1.28
+  service_account_role_arn = local.lab_role_arn
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+  
+  configuration_values = jsonencode({
+    env = {
+      ENABLE_PREFIX_DELEGATION = "true"
+      WARM_PREFIX_TARGET = "1"
+      ENABLE_IPv4 = "true"
+    }
+  })
 
-  image_scanning_configuration {
-    scan_on_push = true
+  depends_on = [aws_eks_node_group.node_group]
+
+  tags = {
+    Name = "vpc-cni-addon"
+  }
+}
+
+resource "aws_eks_addon" "coredns" {
+  cluster_name      = aws_eks_cluster.eks.name
+  addon_name        = "coredns"
+  addon_version     = "v1.10.1-eksbuild.7"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_node_group.node_group]
+
+  tags = {
+    Name = "coredns-addon"
+  }
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name      = aws_eks_cluster.eks.name
+  addon_name        = "kube-proxy"
+  addon_version     = "v1.28.8-eksbuild.5"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_node_group.node_group]
+
+  tags = {
+    Name = "kube-proxy-addon"
   }
 }
