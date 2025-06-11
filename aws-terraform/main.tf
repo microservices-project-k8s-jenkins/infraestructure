@@ -130,7 +130,7 @@ resource "aws_eks_node_group" "node_group" {
     min_size     = 4
   }
 
-  instance_types = ["t3.large"]
+  instance_types = ["m6i.large"]
   capacity_type  = "ON_DEMAND"
   ami_type       = "AL2_x86_64"
 
