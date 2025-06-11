@@ -155,7 +155,6 @@ jobs:
           helm upgrade --install elastic-operator elastic/eck-operator \
             --namespace elastic-system \
             --create-namespace \
-            --version 2.11.1 \
             --wait
 
       - name: Wait for ECK CRDs
@@ -175,10 +174,6 @@ jobs:
             --values basic-eck.yaml \
             --namespace elastic-stack \
             --create-namespace \
-            --set elasticsearch.version="8.11.4" \
-            --set kibana.version="8.11.4" \
-            --set logstash.version="8.11.4" \
-            --set beats.version="8.11.4" \
             --wait \
             --timeout 10m
 
