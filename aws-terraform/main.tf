@@ -193,3 +193,17 @@ resource "aws_eks_addon" "coredns" {
     Name = "coredns-addon"
   }
 }
+
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name   = "aws-ebs-csi-driver"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_addon.coredns]
+
+  tags = {
+    Name = "ebs-csi-driver-addon"
+  }
+}
