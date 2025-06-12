@@ -2,20 +2,15 @@ name: Deploy Infrastructure to AWS
 
 on:
   workflow_dispatch:
-    inputs:
-      destroy:
-        description: 'Destroy infrastructure'
-        required: false
-        default: false
-        type: boolean
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: ${{ secrets.TF_REGION }}
   AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-  TF_VAR_region: ${{ secrets.TF_REGION }}
-  TF_VAR_eks_cluster_name: ${{ secrets.TF_EKS_CLUSTER_NAME }}
+  TF_VAR_region:                ${{ secrets.TF_REGION }}
+  TF_VAR_eks_cluster_name:     ${{ secrets.TF_EKS_CLUSTER_NAME }}
+  TF_VAR_ecr_name:             ${{ secrets.TF_ECR_NAME }}
 
 jobs:
   deploy_infra:
@@ -27,7 +22,7 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.8.3"
           terraform_wrapper: false
 
       - name: Terraform Init
@@ -40,27 +35,20 @@ jobs:
 
       - name: Terraform Plan
         working-directory: aws-terraform/
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color
 
       - name: Terraform Apply
-        if: ${{ !inputs.destroy }}
         working-directory: aws-terraform/
-        run: terraform apply -auto-approve -no-color tfplan
-
-      - name: Terraform Destroy
-        if: ${{ inputs.destroy }}
-        working-directory: aws-terraform/
-        run: terraform destroy -auto-approve -no-color
+        run: terraform apply -auto-approve -no-color
 
       - name: Export Terraform Outputs
-        if: ${{ !inputs.destroy }}
         working-directory: aws-terraform/
         run: |
+          echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" > tf_outputs.env
           echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)" >> tf_outputs.env
           echo "REGION=$(terraform output -raw region)" >> tf_outputs.env
 
       - name: Upload Terraform Outputs Artifact
-        if: ${{ !inputs.destroy }}
         uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
@@ -68,8 +56,7 @@ jobs:
           retention-days: 1
           overwrite: true
 
-  bootstrap_cluster:
-    if: ${{ !inputs.destroy }}
+  bootstrap_argocd:
     needs: deploy_infra
     runs-on: ubuntu-latest
     steps:
@@ -88,21 +75,13 @@ jobs:
           source tf_outputs.env
           echo "EKS_CLUSTER_NAME=${EKS_CLUSTER_NAME}" >> $GITHUB_ENV
           echo "REGION=${REGION}" >> $GITHUB_ENV
-          
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.REGION }}
 
       - name: Configure kubectl for EKS
         run: |
           aws eks update-kubeconfig --region ${{ env.REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v3
         with:
           version: 'latest'
 
@@ -110,115 +89,99 @@ jobs:
         run: |
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-          helm repo add jetstack https://charts.jetstack.io
-          helm repo add elastic https://helm.elastic.co
           helm repo update
 
-      - name: Wait for cluster to be ready
+      - name: Install Cluster Autoscaler
         run: |
-          kubectl wait --for=condition=Ready nodes --all --timeout=300s
-
-      - name: Install Metrics Server
-        run: |
-          helm upgrade --install metrics-server metrics-server/metrics-server \
+          helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
             --namespace kube-system \
-            --set args="{--kubelet-insecure-tls}" \
-            --wait
+            --set autoDiscovery.clusterName=${{ env.EKS_CLUSTER_NAME }} \
+            --set awsRegion=${{ env.REGION }} \
+            --set rbac.create=true \
+            --set rbac.serviceAccount.create=true \
+            --set rbac.serviceAccount.name=cluster-autoscaler \
+            --set image.repository=registry.k8s.io/autoscaling/cluster-autoscaler \
+            --set image.tag=v1.29.0 \
+            --set extraArgs.scale-down-unneeded-time=10m \
+            --set extraArgs.scale-down-delay-after-add=15m \
+            --set extraArgs.scale-down-delay-after-delete=1m \
+            --set extraArgs.scale-down-utilization-threshold=0.5 \
+            --set extraArgs.skip-nodes-with-local-storage=true \
+            --set extraArgs.skip-nodes-with-system-pods=true \
+            --set extraArgs.balance-similar-node-groups=true \
+            --set extraArgs.expander=least-waste \
+            --set 'ignoreTaints={node.kubernetes.io/not-ready,node.kubernetes.io/unreachable,node.kubernetes.io/unschedulable}' \
+            --set extraArgs.ok-total-unready-count=3 \
+            --set extraArgs.max-total-unready-percentage=45 \
+            --set extraArgs.max-node-provision-time=15m
 
-      - name: Install NGINX Ingress Controller
+      - name: Install AWS EBS CSI Driver
         run: |
+          git clone https://github.com/kubernetes-sigs/aws-ebs-csi-driver.git
+          cd aws-ebs-csi-driver
+          kubectl apply -k deploy/kubernetes/overlays/stable
+
+      - name: Install Ingress Controller
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo update
+
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
-            --create-namespace \
-            --set controller.service.type=LoadBalancer \
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
-            --wait
+            --create-namespace
 
-      - name: Install Cert Manager
+      - name: Install cert manager
         run: |
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo update
+
           helm upgrade --install cert-manager jetstack/cert-manager \
             --namespace cert-manager \
             --create-namespace \
-            --version v1.16.1 \
-            --set crds.enabled=true \
-            --wait
+            --set installCRDs=true
 
-      - name: Install Calico Network Policies
-        run: |
-          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico-policy-only.yaml
-          kubectl wait --for condition=Ready pods -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
 
       - name: Install ECK Operator
         run: |
+          helm repo add elastic https://helm.elastic.co
+          helm repo update
+          
           helm upgrade --install elastic-operator elastic/eck-operator \
             --namespace elastic-system \
             --create-namespace \
             --wait
 
-      - name: Wait for ECK CRDs
-        run: |
-          kubectl wait --for condition=Established crd/elasticsearches.elasticsearch.k8s.elastic.co --timeout=120s
-          kubectl wait --for condition=Established crd/kibanas.kibana.k8s.elastic.co --timeout=120s
-          kubectl wait --for condition=Established crd/logstashes.logstash.k8s.elastic.co --timeout=120s
-          kubectl wait --for condition=Established crd/beats.beat.k8s.elastic.co --timeout=120s
-
       - name: Install ECK Stack with Logstash
         run: |
+          kubectl wait --for condition=Established crd/elasticsearches.elasticsearch.k8s.elastic.co --timeout=120s || true
+          kubectl wait --for condition=Established crd/kibanas.kibana.k8s.elastic.co --timeout=120s || true
+          kubectl wait --for condition=Established crd/logstashes.logstash.k8s.elastic.co --timeout=120s || true
+          kubectl wait --for condition=Established crd/beats.beat.k8s.elastic.co --timeout=120s || true
           curl -sSfL -o basic-eck.yaml https://raw.githubusercontent.com/elastic/cloud-on-k8s/3.0/deploy/eck-stack/examples/logstash/basic-eck.yaml
           sed -i '/daemonSet: null/d' basic-eck.yaml
           sed -i 's/type: log/type: filestream/g' basic-eck.yaml
-          
           helm upgrade --install eck-stack-with-logstash elastic/eck-stack \
             --values basic-eck.yaml \
             --namespace elastic-stack \
             --create-namespace \
-            --wait \
-            --timeout 10m
+            --wait
 
-      - name: Install Prometheus and Grafana
+
+      - name: Install Prometheus and Grafana (kube-prometheus-stack)
         run: |
           helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
             --namespace monitoring \
             --create-namespace \
-            --version 65.1.1 \
-            --set grafana.adminPassword='${{ secrets.GRAFANA_PASSWORD || 'Password@1234' }}' \
+            --set grafana.adminPassword='Password@1234' \
             --set grafana.service.type=ClusterIP \
-            --set prometheus.prometheusSpec.retention=30d \
-            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=20Gi \
-            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=5Gi \
-            --wait \
-            --timeout 10m
+            --set prometheus.prometheusSpec.persistentVolume.enabled=false \
+            --set alertmanager.alertmanagerSpec.persistentVolume.enabled=false \
+            --set grafana.persistence.enabled=false
 
-      - name: Setup ArgoCD Bootstrap
+      - name: Clone Helm Charts Repository for ArgoCD
         run: |
-          echo "Cloning Helm Charts Repository..."
           git clone https://github.com/microservices-project-k8s-jenkins/ecommerce-charts.git
-          
-          if [ -f "./ecommerce-charts/scripts/bootstrap.sh" ]; then
-            chmod +x ./ecommerce-charts/scripts/bootstrap.sh
-            ./ecommerce-charts/scripts/bootstrap.sh
-          else
-            echo "Bootstrap script not found, skipping..."
-          fi
-
-      - name: Verify Installations
-        run: |
-          echo "=== Cluster Info ==="
-          kubectl cluster-info
-          
-          echo "=== Node Status ==="
-          kubectl get nodes -o wide
-          
-          echo "=== All Pods Status ==="
-          kubectl get pods --all-namespaces
-          
-          echo "=== Services ==="
-          kubectl get svc --all-namespaces
-          
-          echo "=== Ingress Controllers ==="
-          kubectl get pods -n ingress-nginx
-          
-          echo "=== Load Balancer External IPs ==="
-          kubectl get svc -n ingress-nginx
+          chmod +x ./ecommerce-charts/scripts/bootstrap.sh
+          echo "Waiting for monitoring pods to be ready..."
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kube-prometheus-stack -n monitoring --timeout=300s || echo "Timeout waiting for monitoring pods, continuing..."
+          ./ecommerce-charts/scripts/bootstrap.sh
