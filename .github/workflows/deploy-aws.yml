@@ -188,7 +188,8 @@ jobs:
             --set prometheus.prometheusSpec.retention=30d \
             --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=20Gi \
             --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=5Gi \
-            --set prometheus.prometheusSpec.ruleSelector.matchLabels.role=alert-rules \
+            --set prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues=false \
+            --set prometheus.prometheusSpec.ruleSelector.matchLabels.release=kube-prometheus-stack \
             --wait \
             --timeout 10m
 
