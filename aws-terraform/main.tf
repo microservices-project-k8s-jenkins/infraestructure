@@ -135,7 +135,7 @@ resource "aws_eks_node_group" "node_group" {
   ami_type       = "AL2_x86_64"
 
   update_config {
-    max_unavailable = 0
+    max_unavailable = 1
   }
 
 }
