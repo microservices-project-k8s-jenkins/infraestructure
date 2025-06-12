@@ -125,9 +125,9 @@ resource "aws_eks_node_group" "node_group" {
   subnet_ids      = aws_subnet.subnet[*].id
 
   scaling_config {
-    desired_size = 4
-    max_size     = 4
-    min_size     = 4
+    desired_size = 6
+    max_size     = 6
+    min_size     = 6
   }
 
   instance_types = ["m6i.large"]
@@ -135,7 +135,7 @@ resource "aws_eks_node_group" "node_group" {
   ami_type       = "AL2_x86_64"
 
   update_config {
-    max_unavailable_percentage = 25
+    max_unavailable_percentage = 0
   }
 
 }
