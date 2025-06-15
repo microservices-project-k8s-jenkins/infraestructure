@@ -130,6 +130,10 @@ jobs:
         run: |
           linkerd check --pre
 
+      - name: Install Linkerd CRDs
+        run: |
+          linkerd install --crds | kubectl apply -f -
+
       - name: Install Linkerd Control Plane
         run: |
           linkerd install | kubectl apply -f -
