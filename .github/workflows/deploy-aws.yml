@@ -130,6 +130,10 @@ jobs:
         run: |
           linkerd check --pre
 
+      - name: Install Gateway API CRDs
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+
       - name: Install Linkerd CRDs
         run: |
           linkerd install --crds | kubectl apply -f -
