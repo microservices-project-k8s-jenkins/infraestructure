@@ -120,6 +120,26 @@ jobs:
         run: |
           kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
+      - name: Install Linkerd CLI
+        run: |
+          curl -sL https://run.linkerd.io/install | sh
+          export PATH=$PATH:$HOME/.linkerd2/bin
+          echo "$HOME/.linkerd2/bin" >> $GITHUB_PATH
+
+      - name: Check Cluster for Linkerd Compatibility
+        run: |
+          linkerd check --pre
+
+      - name: Install Linkerd Control Plane
+        run: |
+          linkerd install | kubectl apply -f -
+          linkerd check
+
+      - name: Install Linkerd Viz Extension (Dashboard)
+        run: |
+          linkerd viz install | kubectl apply -f -
+          linkerd viz check
+
       - name: Install Metrics Server
         run: |
           helm upgrade --install metrics-server metrics-server/metrics-server \
