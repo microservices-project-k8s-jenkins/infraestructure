@@ -192,6 +192,20 @@ jobs:
             --wait \
             --timeout 10m
 
+      - name: Install Chaos Mesh
+        run: |
+          helm repo add chaos-mesh https://charts.chaos-mesh.org
+          helm repo update
+
+          helm upgrade --install chaos-mesh chaos-mesh/chaos-mesh \
+            --namespace chaos-testing \
+            --create-namespace \
+            --set chaosDaemon.runtime=containerd \
+            --set chaosDaemon.socketPath=/run/containerd/containerd.sock \
+            --wait
+
+          kubectl wait --for=condition=Ready pods --all -n chaos-testing --timeout=300s      
+
       - name: Create Alert Rules ConfigMap
         run: |
           cat <<EOF | kubectl apply -f -
