@@ -347,7 +347,3 @@ jobs:
           
           echo "=== Linkerd Status ==="
           linkerd check
-          
-          echo "=== Application Namespaces ==="
-          kubectl get namespaces -l linkerd.io/inject=enabled
-          kubectl get namespaces ecommerce-master ecommerce-stage ecommerce-dev -o yaml
