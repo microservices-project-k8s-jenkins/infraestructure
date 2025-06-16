@@ -125,6 +125,34 @@ jobs:
           kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico-policy-only.yaml
           kubectl wait --for condition=Ready pods -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
 
+      - name: Install Linkerd CLI
+        run: |
+          curl -sL https://run.linkerd.io/install | sh
+          export PATH=$PATH:$HOME/.linkerd2/bin
+          echo "$HOME/.linkerd2/bin" >> $GITHUB_PATH
+
+      - name: Check Cluster for Linkerd Compatibility
+        run: |
+          linkerd check --pre
+
+      - name: Install Gateway API CRDs
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+
+      - name: Install Linkerd CRDs
+        run: |
+          linkerd install --crds | kubectl apply -f -
+
+      - name: Install Linkerd Control Plane
+        run: |
+          linkerd install | kubectl apply -f -
+          linkerd check
+
+      - name: Install Linkerd Viz Extension (Dashboard)
+        run: |
+          linkerd viz install | kubectl apply -f -
+          linkerd viz check
+
       - name: Create Linkerd NetworkPolicies
         run: |
           cat <<EOF | kubectl apply -f -
@@ -192,34 +220,6 @@ jobs:
             egress:
             - {}
           EOF
-
-      - name: Install Linkerd CLI
-        run: |
-          curl -sL https://run.linkerd.io/install | sh
-          export PATH=$PATH:$HOME/.linkerd2/bin
-          echo "$HOME/.linkerd2/bin" >> $GITHUB_PATH
-
-      - name: Check Cluster for Linkerd Compatibility
-        run: |
-          linkerd check --pre
-
-      - name: Install Gateway API CRDs
-        run: |
-          kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
-
-      - name: Install Linkerd CRDs
-        run: |
-          linkerd install --crds | kubectl apply -f -
-
-      - name: Install Linkerd Control Plane
-        run: |
-          linkerd install | kubectl apply -f -
-          linkerd check
-
-      - name: Install Linkerd Viz Extension (Dashboard)
-        run: |
-          linkerd viz install | kubectl apply -f -
-          linkerd viz check
 
       - name: Install Metrics Server
         run: |
