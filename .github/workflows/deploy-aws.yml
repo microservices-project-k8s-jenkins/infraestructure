@@ -120,6 +120,79 @@ jobs:
         run: |
           kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
+      - name: Install Calico Network Policies
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico-policy-only.yaml
+          kubectl wait --for condition=Ready pods -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
+
+      - name: Create Linkerd NetworkPolicies
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-control-plane
+            namespace: linkerd
+          spec:
+            podSelector: {}
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-proxy
+            namespace: linkerd
+          spec:
+            podSelector:
+              matchLabels:
+                linkerd.io/control-plane-component: proxy
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-viz
+            namespace: linkerd-viz
+          spec:
+            podSelector: {}
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-allow-all
+            namespace: default
+          spec:
+            podSelector:
+              matchLabels:
+                linkerd.io/proxy-deployment: "true"
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          EOF
+
       - name: Install Linkerd CLI
         run: |
           curl -sL https://run.linkerd.io/install | sh
@@ -172,11 +245,6 @@ jobs:
             --version v1.16.1 \
             --set crds.enabled=true \
             --wait
-
-      - name: Install Calico Network Policies
-        run: |
-          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico-policy-only.yaml
-          kubectl wait --for condition=Ready pods -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
 
       - name: Install ECK Operator
         run: |
@@ -245,7 +313,6 @@ jobs:
                       description: "Pod {{ \$labels.pod }} is using more than 80% CPU."
           EOF
 
-
       - name: Setup ArgoCD Bootstrap
         run: |
           echo "Cloning Helm Charts Repository..."
@@ -277,3 +344,10 @@ jobs:
           
           echo "=== Load Balancer External IPs ==="
           kubectl get svc -n ingress-nginx
+          
+          echo "=== Linkerd Status ==="
+          linkerd check
+          
+          echo "=== Application Namespaces ==="
+          kubectl get namespaces -l linkerd.io/inject=enabled
+          kubectl get namespaces ecommerce-master ecommerce-stage ecommerce-dev -o yaml
