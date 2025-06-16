@@ -120,6 +120,107 @@ jobs:
         run: |
           kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
+      - name: Install Calico Network Policies
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico-policy-only.yaml
+          kubectl wait --for condition=Ready pods -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
+
+      - name: Install Linkerd CLI
+        run: |
+          curl -sL https://run.linkerd.io/install | sh
+          export PATH=$PATH:$HOME/.linkerd2/bin
+          echo "$HOME/.linkerd2/bin" >> $GITHUB_PATH
+
+      - name: Check Cluster for Linkerd Compatibility
+        run: |
+          linkerd check --pre
+
+      - name: Install Gateway API CRDs
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+
+      - name: Install Linkerd CRDs
+        run: |
+          linkerd install --crds | kubectl apply -f -
+
+      - name: Install Linkerd Control Plane
+        run: |
+          linkerd install | kubectl apply -f -
+          linkerd check
+
+      - name: Install Linkerd Viz Extension (Dashboard)
+        run: |
+          linkerd viz install | kubectl apply -f -
+          linkerd viz check
+
+      - name: Create Linkerd NetworkPolicies
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-control-plane
+            namespace: linkerd
+          spec:
+            podSelector: {}
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-proxy
+            namespace: linkerd
+          spec:
+            podSelector:
+              matchLabels:
+                linkerd.io/control-plane-component: proxy
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-viz
+            namespace: linkerd-viz
+          spec:
+            podSelector: {}
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: linkerd-allow-all
+            namespace: default
+          spec:
+            podSelector:
+              matchLabels:
+                linkerd.io/proxy-deployment: "true"
+            policyTypes:
+            - Ingress
+            - Egress
+            ingress:
+            - {}
+            egress:
+            - {}
+          EOF
+
       - name: Install Metrics Server
         run: |
           helm upgrade --install metrics-server metrics-server/metrics-server \
@@ -144,11 +245,6 @@ jobs:
             --version v1.16.1 \
             --set crds.enabled=true \
             --wait
-
-      - name: Install Calico Network Policies
-        run: |
-          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico-policy-only.yaml
-          kubectl wait --for condition=Ready pods -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
 
       - name: Install ECK Operator
         run: |
@@ -188,7 +284,8 @@ jobs:
             --set prometheus.prometheusSpec.retention=30d \
             --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=20Gi \
             --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=5Gi \
-            --set prometheus.prometheusSpec.ruleSelector.matchLabels.role=alert-rules \
+            --set prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues=false \
+            --set prometheus.prometheusSpec.ruleSelector.matchLabels.release=kube-prometheus-stack \
             --wait \
             --timeout 10m
 
@@ -204,31 +301,31 @@ jobs:
             --set chaosDaemon.socketPath=/run/containerd/containerd.sock \
             --wait
 
-          kubectl wait --for=condition=Ready pods --all -n chaos-testing --timeout=300s      
+          kubectl wait --for=condition=Ready pods --all -n chaos-testing --timeout=300s
 
-      - name: Create Alert Rules ConfigMap
+
+      - name: Create Alert Rules as PrometheusRule
         run: |
           cat <<EOF | kubectl apply -f -
-          apiVersion: v1
-          kind: ConfigMap
+          apiVersion: monitoring.coreos.com/v1
+          kind: PrometheusRule
           metadata:
             name: custom-alert-rules
             namespace: monitoring
             labels:
-              role: alert-rules
-          data:
-            custom-rules.yaml: |
-              groups:
-                - name: example.rules
-                  rules:
-                    - alert: HighCPUUsage
-                      expr: sum(rate(container_cpu_usage_seconds_total{image!=""}[1m])) by (pod) > 0.8
-                      for: 1m
-                      labels:
-                        severity: warning
-                      annotations:
-                        summary: "High CPU usage detected on pod"
-                        description: "Pod {{ \$labels.pod }} is using more than 80% CPU."
+              release: kube-prometheus-stack
+          spec:
+            groups:
+              - name: example.rules
+                rules:
+                  - alert: HighCPUUsage
+                    expr: sum(rate(container_cpu_usage_seconds_total{image!=""}[1m])) by (pod) > 0.8
+                    for: 1m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "High CPU usage detected on pod"
+                      description: "Pod {{ \$labels.pod }} is using more than 80% CPU."
           EOF
 
       - name: Setup ArgoCD Bootstrap
@@ -262,3 +359,6 @@ jobs:
           
           echo "=== Load Balancer External IPs ==="
           kubectl get svc -n ingress-nginx
+          
+          echo "=== Linkerd Status ==="
+          linkerd check
